@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - AI Resume Analyzer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght=400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: #4d89eb;
+            color: #1e293b;
+            min-height: 100vh;
+        }
+        .navbar-custom {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.05);
+        }
+        .dashboard-card {
+            background: #ffffff;
+            border: none;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+        .text-muted-custom {
+            color: #64748b;
+        }
+        .brand-logo {
+            font-weight: 700;
+            color: #4d89eb;
+            text-decoration: none;
+        }
+        pre {
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            color: #0f172a;
+            padding: 15px;
+            border-radius: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        .history-scroll {
+            max-height: 450px;
+            overflow-y: auto;
+        }
+        .history-scroll::-webkit-scrollbar {
+            width: 5px;
+        }
+        .history-scroll::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .markdown-output h1, .markdown-output h2, .markdown-output h3 {
+            color: #0f172a;
+            font-weight: 700;
+            margin-top: 1.2rem;
+            margin-bottom: 0.6rem;
+            font-size: 1.15rem;
+        }
+        .markdown-output ul {
+            padding-left: 1.2rem;
+            color: #334155;
+        }
+        .markdown-output li {
+            margin-bottom: 0.4rem;
+        }
+        .chart-container {
+            position: relative;
+            margin: auto;
+            height: 220px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Navigation Header -->
+    <nav class="navbar navbar-expand-lg navbar-custom py-3 mb-5">
+        <div class="container">
+            <a class="navbar-brand brand-logo fs-3" href="#">AI Resume Analyzer</a>
+            <div class="d-flex align-items-center gap-3">
+                <span class="text-muted-custom">Hello, <strong class="text-dark">{{ user.username }}</strong></span>
+                <a href="{% url 'logout' %}" class="btn btn-outline-danger btn-sm rounded-pill px-3">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container pb-5">
+        
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} border-0 shadow text-center mb-4" role="alert">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <div class="row g-4">
+            
+            <!-- LEFT COLUMN: Input Control Panel -->
+            <div class="col-12 col-md-4">
+                
+                <!-- Resume File Upload Component -->
+                <div class="card dashboard-card p-4 shadow-lg text-center mb-4">
+                    <h5 class="fw-bold text-dark mb-3">Upload Candidate Resume</h5>
+                    <p class="text-muted-custom small mb-4">Supported formats: PDF Documents only</p>
+                    
+                    <form action="{% url 'dashboard' %}" method="POST" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <input class="form-control rounded-3" type="file" name="resume" id="resume-input" accept=".pdf" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold rounded-3 shadow" style="background-color: #4d89eb; border: none;">
+                            Process Document Engine
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Screening History Historical Ledger -->
+                <div class="card dashboard-card p-4 shadow-lg">
+                    <h5 class="fw-bold text-dark mb-2">Screening History</h5>
+                    <p class="text-muted-custom small mb-3">Your account's structural processing record log indexes.</p>
+                    <hr class="text-muted my-2">
+                    
+                    <div class="list-group list-group-flush history-scroll">
+                        {% if past_analyses %}
+                            {% for item in past_analyses %}
+                                <div class="list-group-item bg-transparent px-0 py-2.5 border-bottom">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="badge {% if item.decision == 'GO' %}bg-success{% elif item.decision == 'NO-GO' %}bg-danger{% else %}bg-warning text-dark{% endif %}">
+                                            {{ item.decision }}
+                                        </span>
+                                        <span class="badge bg-light text-dark border fw-bold text-muted-custom" style="font-size: 0.75rem;">
+                                            {{ item.match_score }}% Match
+                                        </span>
+                                    </div>
+                                    <div class="text-dark small text-truncate fw-bold mb-0" title="{{ item.filename }}">
+                                        {{ item.filename }}
+                                    </div>
+                                    <small class="text-muted-custom d-block" style="font-size: 0.7rem;">
+                                        {{ item.created_at|date:"M d, Y h:i A" }}
+                                    </small>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="text-center py-4">
+                                <p class="text-muted mb-0 small">No historical vector data streams tracked yet.</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN: Analytics, JD Input, and AI Results -->
+            <div class="col-12 col-md-8">
+                
+                <!-- Analytics Panel: Dynamic metrics graphs -->
+                {% if past_analyses %}
+                <div class="card dashboard-card p-4 shadow-lg mb-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 class="fw-bold text-dark mb-1">Screening Analytics Panel</h4>
+                            <p class="text-muted-custom small mb-0">System performance metrics and historical match distribution trends.</p>
+                        </div>
+                        <button class="btn btn-sm btn-outline-secondary rounded-pill px-3" type="button" data-bs-toggle="collapse" data-bs-target="#analyticsCollapse" aria-expanded="true" aria-controls="analyticsCollapse">
+                            Toggle Views
+                        </button>
+                    </div>
+                    
+                    <div class="collapse show" id="analyticsCollapse">
+                        <hr class="text-muted my-3">
+                        <div class="row g-3">
+                            <div class="col-12 col-md-7">
+                                <div class="fw-semibold small text-dark mb-2 text-center">Match Score Trajectory (%)</div>
+                                <div class="chart-container">
+                                    <canvas id="trajectoryChart"></canvas>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-5">
+                                <div class="fw-semibold small text-dark mb-2 text-center">Decision Outcome Ratios</div>
+                                <div class="chart-container">
+                                    <canvas id="ratioChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Engine Workspace Status: Target JD Input Panel -->
+                <div class="card dashboard-card p-4 shadow-lg mb-4">
+                    <h4 class="fw-bold text-dark mb-1">Engine Workspace Status</h4> 
+                    <p class="text-muted-custom small mb-3">Compare your uploaded resume assets directly against specific industry requirements.</p>
+                    
+                    {% if extracted_text %}
+                        <div class="mb-2 text-success small fw-semibold">
+                            ✓ Extracted Data Vector Source: <span class="text-dark">{{ filename }}</span>
+                        </div>
+                        <h6 class="text-muted-custom mt-2 mb-2 small">Raw Document Content Read Stream:</h6>
+                        <pre><code>{{ extracted_text }}</code></pre>
+                    {% endif %}
+                    
+                    <form action="{% url 'dashboard' %}" method="POST" class="mt-3">
+                        {% csrf_token %}
+                        <input type="hidden" name="run_ai_analysis" value="1">
+                        
+                        <div class="mb-3">
+                            <label for="job_description" class="form-label text-dark fw-bold small mb-1">Target Job Description (JD Comparison Mode):</label>
+                            <textarea name="job_description" id="job_description" class="form-control rounded-3" rows="5" placeholder="Paste the target job description or role details here to analyze keyword gaps, discover missing technical skills, and compare criteria..." required>{{ job_description|default:'' }}</textarea>
+                        </div>
+
+                        <button type="submit" id="submit-ai-analysis" class="btn btn-success w-100 py-2.5 fw-semibold rounded-3 shadow text-white">
+                            Run AI Smart Analysis & Compare Match →
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Intelligent AI Deep Screening Scorecard Matrix Layout -->
+                {% if ai_analysis %}
+                    <div class="card dashboard-card p-4 shadow-lg">
+                        <div class="row align-items-center g-3 mb-2">
+                            <div class="col-12 col-sm-8 text-center text-sm-start">
+                                <h4 class="fw-bold text-dark mb-1">AI Deep Screening Scorecard Matrix</h4>
+                                <p class="text-muted small mb-0">Compiled Profile Context Evaluation Report</p>
+                            </div>
+                            
+                            <div class="col-12 col-sm-4 text-center text-sm-end d-flex justify-content-center justify-content-sm-end">
+                                <div class="position-relative d-inline-flex align-items-center justify-content-center" style="width: 90px; height: 90px;">
+                                    <svg width="90" height="90" viewBox="0 0 100 100">
+                                        <circle cx="50" cy="50" r="40" stroke="#f1f5f9" stroke-width="10" fill="transparent" />
+                                        <circle cx="50" cy="50" r="40" 
+                                                stroke="{% if decision == 'GO' %}#10b981{% elif decision == 'NO-GO' %}#ef4444{% else %}#f59e0b{% endif %}" 
+                                                stroke-width="10" fill="transparent" 
+                                                stroke-dasharray="251.2" 
+                                                stroke-dashoffset="calc(251.2 - (251.2 * {{ match_score|default:0 }}) / 100)" 
+                                                stroke-linecap="round" 
+                                                transform="rotate(-90 50 50)" />
+                                    </svg>
+                                    <div class="position-absolute text-center w-100">
+                                        <span class="fs-5 fw-bold text-dark d-block lh-1 mb-0">{{ match_score|default:0 }}%</span>
+                                        <small class="text-muted fw-bold" style="font-size: 0.55rem; letter-spacing: 0.5px;">MATCH</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <hr class="text-muted mt-2">
+                        <div id="markdown-container" class="markdown-output"></div>
+                        
+                        <!-- Tailor CV across given JD Action section -->
+                        <div class="mt-4 pt-3 border-top text-center">
+                            <p class="text-muted small fw-semibold">Want to bridge identified keyword gaps and automatically align your layout with this JD?</p>
+                            <a href="{% url 'upgrade_cv' %}" id="upgrade-cv-btn" class="btn btn-primary shadow px-4 py-2.5 fw-semibold rounded-3" style="background-color: #4d89eb; border: none;">
+                                📥 Download Automatically Tailored ATS Resume
+                            </a>
+                        </div>
+                    </div>  
+                {% endif %}
+                    
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading State Dynamic Processing Window Overlay -->
+    <div id="loading-overlay" class="position-fixed top-0 start-0 w-100 h-100 d-none justify-content-center align-items-center flex-column" style="background: rgba(255, 255, 255, 0.85); z-index: 9999;">
+        <div class="spinner-border text-primary mb-3" role="status" style="width: 3.5rem; height: 3.5rem;"></div>
+        <h5 class="fw-bold text-dark">AI Intelligence Layer Engine Processing...</h5>
+        <p class="text-muted small">Parsing structural vectors, cross-referencing JD models, and building scorecard output...</p>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            
+            // Loading mask trigger for basic file upload
+            const uploadForm = document.querySelector('form[enctype="multipart/form-data"]');
+            if (uploadForm) {
+                uploadForm.addEventListener('submit', function() {
+                    document.getElementById('loading-overlay').classList.remove('d-none');
+                    document.getElementById('loading-overlay').classList.add('d-flex');
+                });
+            }
+
+            // Loading mask trigger for running AI Smart Analysis comparison
+            const aiForm = document.querySelector('form[method="POST"]:not([enctype="multipart/form-data"])');
+            if (aiForm) {
+                aiForm.addEventListener('submit', function() {
+                    document.getElementById('loading-overlay').classList.remove('d-none');
+                    document.getElementById('loading-overlay').classList.add('d-flex');
+                });
+            }
+
+            // Parse raw markdown evaluation responses 
+            {% if ai_analysis %}
+                const rawMarkdown = `{{ ai_analysis|escapejs }}`; 
+                const container = document.getElementById('markdown-container');
+                if (container) {
+                    container.innerHTML = marked.parse(rawMarkdown);
+                }
+            {% endif %}
+
+            // Loading wrapper for the tailored CV downloading route
+            const upgradeBtn = document.getElementById('upgrade-cv-btn');
+            if (upgradeBtn) {
+                upgradeBtn.addEventListener('click', function() {
+                    document.getElementById('loading-overlay').classList.remove('d-none');
+                    document.getElementById('loading-overlay').classList.add('d-flex');
+                    
+                    setTimeout(() => {
+                        document.getElementById('loading-overlay').classList.remove('d-flex');
+                        document.getElementById('loading-overlay').classList.add('d-none');
+                    }, 3000);
+                });
+            }
+
+            // --- CHART.JS RENDERING SCRIPT DRIVERS ---
+            {% if past_analyses %}
+                const dates = {{ chart_dates|safe }};
+                const scores = {{ chart_scores|safe }};
+                const distribution = {{ decision_counts|safe }};
+
+                const ctxLine = document.getElementById('trajectoryChart').getContext('2d');
+                new Chart(ctxLine, {
+                    type: 'line',
+                    data: {
+                        labels: dates,
+                        datasets: [{
+                            label: 'Match Percentage',
+                            data: scores,
+                            borderColor: '#4d89eb',
+                            backgroundColor: 'rgba(77, 137, 235, 0.1)',
+                            borderWidth: 2.5,
+                            tension: 0.3,
+                            fill: true,
+                            pointBackgroundColor: '#ffffff',
+                            pointBorderColor: '#4d89eb',
+                            pointHoverRadius: 6
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: { min: 0, max: 100, grid: { color: '#f1f5f9' }, ticks: { color: '#64748b' } },
+                            x: { grid: { display: false }, ticks: { color: '#64748b' } }
+                        }
+                    }
+                });
+
+                const ctxDoughnut = document.getElementById('ratioChart').getContext('2d');
+                new Chart(ctxDoughnut, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Go', 'No-Go', 'Review/Maybe'],
+                        datasets: [{
+                            data: distribution,
+                            backgroundColor: ['#10b981', '#ef4444', '#f59e0b'],
+                            borderWidth: 2,
+                            borderColor: '#ffffff'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 }, color: '#64748b' } }
+                        },
+                        cutout: '70%'
+                    }
+                });
+            {% endif %}
+        });
+    </script>    
+
+</body>
+</html>
